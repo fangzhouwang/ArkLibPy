@@ -1,5 +1,5 @@
 import unittest
-from ArkDBMySQL import ArkDBMySQL
+from ArkLibPy.ArkDBMySQL import *
 
 
 class ArkDBMySQLTestCase(unittest.TestCase):
@@ -24,6 +24,9 @@ class ArkDBMySQLTestCase(unittest.TestCase):
         self.db_.run_sql(f'CREATE TABLE {self.table_} (str_col VARCHAR(20), int_col INT PRIMARY KEY)')
 
         self.db_.set_table(self.table_)
+        temp = self.db_.get_query_value('int_col', 'SELECT int_col FROM test_table')
+        self.assertIsNone(temp)
+
         rowid = self.db_.insert({"int_col" : 1, "str_col" : "test"})
         self.assertEqual(rowid, 0)
         self.db_.insert({"int_col" : 2, "str_col" : "test"})

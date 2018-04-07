@@ -45,6 +45,9 @@ class ArkDBMySQL:
     def set_table(self, table_name):
         self.table_ = table_name
 
+    def get_table(self):
+        return self.table_
+
     def set_auto_inc(self, inc):
         cur_inc = self.get_auto_inc()
         if cur_inc >= inc:
@@ -90,7 +93,10 @@ class ArkDBMySQL:
         return self.cur_.fetchone()
 
     def get_query_value(self, val_name, query, params=()):
-        return self.get_query_row(query, params)[val_name]
+        row = self.get_query_row(query, params)
+        if row is None or val_name not in row:
+            return None
+        return row[val_name]
 
     def insert_nocommit(self, rec):
         klist = sorted(rec.keys())
