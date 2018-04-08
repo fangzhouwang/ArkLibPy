@@ -185,3 +185,20 @@ class ArkDBMySQL:
         data_size = self.get_query_value('size_in_mb', f'SELECT table_name AS `Table`, round(((data_length) / 1024 / 1024), 2) AS `size_in_mb` FROM information_schema.TABLES WHERE table_schema = "{self.schema_}" AND table_name = "{table}"')
         index_size = self.get_query_value('size_in_mb', f'SELECT table_name AS `Table`, round(((index_length) / 1024 / 1024), 2) AS `size_in_mb` FROM information_schema.TABLES WHERE table_schema = "{self.schema_}" AND table_name = "{table}"')
         return data_size, index_size
+
+    def create_table(self, table_desc_dict, force=False):
+        if self.is_table_exist(table_desc_dict['table_name']):
+            if not force:
+                return False
+            self.run_sql(f"DROP TABLE {table_desc_dict['table_name']}")
+        columns_desc_list = [f"`{item['name']}` {item['type']} {item['property']}"
+                            for item in table_desc_dict['table_columns']]
+        query = f"CREATE TABLE `{table_desc_dict['table_name']}` ("
+        query += ', '.join(columns_desc_list)
+        query += ', PRIMARY KEY ('
+        query += ', '.join([f'`{col}`' for col in table_desc_dict['table_pks']])
+        query += '))'
+        query += 'ENGINE = InnoDB'
+        self.run_sql(query)
+        return True
+
