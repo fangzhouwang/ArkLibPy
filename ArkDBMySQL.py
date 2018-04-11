@@ -57,15 +57,25 @@ class ArkDBMySQL:
         return True
 
     def get_auto_inc(self):
-        return self.get_query_value('AUTO_INCREMENT', f"SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='{self.schema_}' AND TABLE_NAME='{self.table_}'")
+        return self.get_query_value('AUTO_INCREMENT',
+                                    f"SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES "
+                                    f"WHERE TABLE_SCHEMA='{self.schema_}' AND TABLE_NAME='{self.table_}'")
 
     def run_sql_nocommit(self, sql, params=()):
+        # TODO: Add crash resilient code to recover from a failed query
         self.err_ = None
         try:
             self.cur_.execute(sql, params)
         except mysql.connector.Error as err:
             self.err_ = err
-            print("DB error: {}".format(err))
+            print('### DB error ###')
+            print(f'Error msg: {format(err)}')
+            print('- - - - - - - -')
+            print(f'SQL: {sql}')
+            if params:
+                print('- - - - with params - - - -')
+                print(params)
+            print('### END of DB error report ###')
 
     def commit(self):
         self.con_.commit()
