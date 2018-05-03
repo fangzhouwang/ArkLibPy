@@ -42,6 +42,17 @@ class ArkDBMySQL:
     def __del__(self):
         self.con_.close()
 
+    def dup_self(self):
+        duplicated_db = ArkDBMySQL(
+            host=self.host_,
+            user=self.user_,
+            password=self.password_,
+            schema=self.schema_,
+            port=self.port_,
+        )
+        duplicated_db.set_table(self.table_)
+        return duplicated_db
+
     def set_table(self, table_name):
         self.table_ = table_name
 
