@@ -1,56 +1,50 @@
 #!/usr/bin/env python3
 
-# Developed based on bwDB - CRUD library for sqlite 3 by Bill Weinman [http://bw.org/]
+# Extended from bwDB - CRUD library for sqlite 3 by Bill Weinman [http://bw.org/]
 
-import mysql.connector
+import sqlite3
 
 __version__ = '1.0.0'
 
 
-class ArkDBMySQL:
+class ArkDBSQLite:
     def __init__(self, **kwargs):
         """
-            db = ArkDBMySQL( [ table = ''] [, db_config_file = ''] )
+            db = ArkDBSQLite ( [ table = ''] [, filename = ''] )
             constructor method
         """
         db_config_file = kwargs.get('db_config_file', '')
         if db_config_file:
             with open(db_config_file) as config:
-                self.host_ = config.readline().rstrip()
-                self.user_ = config.readline().rstrip()
-                self.password_ = config.readline().rstrip()
-                self.schema_ = config.readline().rstrip()
-                self.port_ = int(config.readline().rstrip())
+                config.readline().rstrip() # skip host
+                config.readline().rstrip() # skip user
+                config.readline().rstrip() # skip password
+                self.filename_ = config.readline().rstrip() # use schema name as filename
         else:
-            self.host_ = kwargs.get('host')
-            self.user_ = kwargs.get('user')
-            self.password_ = kwargs.get('password')
-            self.schema_ = kwargs.get('schema')
-            self.port_ = kwargs.get('port', 3306)   # default MySQL port is 3306
+            # see filename setter below
+            self.filename_ = kwargs.get('filename')
 
         self.table_ = ''
-        self.con_ = mysql.connector.connect(
-            user=self.user_,
-            password=self.password_,
-            host=self.host_,
-            database=self.schema_,
-        )
-        self.cur_ = self.con_.cursor(dictionary=True, buffered=True)
         self.err_ = None
 
-    def __del__(self):
-        self.con_.close()
+    # filename property
+    @property
+    def filename_(self):
+        return self.dbfilename_
 
-    def dup_self(self):
-        duplicated_db = ArkDBMySQL(
-            host=self.host_,
-            user=self.user_,
-            password=self.password_,
-            schema=self.schema_,
-            port=self.port_,
-        )
-        duplicated_db.set_table(self.table_)
-        return duplicated_db
+    @filename_.setter
+    def filename_(self, fn):
+        self.dbfilename_ = f'{fn}.sqlite3'
+        self.con_ = sqlite3.connect(self.dbfilename_)
+        self.con_.row_factory = sqlite3.Row
+
+    @filename_.deleter
+    def filename_(self):
+        self.close()
+
+    def close(self):
+        self.con_.close()
+        del self.dbfilename_
 
     def set_table(self, table_name):
         self.table_ = table_name
@@ -59,17 +53,17 @@ class ArkDBMySQL:
         return self.table_
 
     def set_auto_inc(self, inc):
-        cur_inc = self.get_auto_inc()
-        if cur_inc >= inc:
-            print(f'Error: Current value {cur_inc} is larger than {inc}')
-            return False
-        self.run_sql(f'ALTER TABLE {self.table_} AUTO_INCREMENT=%s', [inc])
-        return True
+        """
+        UPDATE
+        SQLITE_SEQUENCE
+        SET
+        seq = < n > WHERE
+        name = '<table>'
+        """
+        pass
 
     def get_auto_inc(self):
-        return self.get_query_value('AUTO_INCREMENT',
-                                    f"SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES "
-                                    f"WHERE TABLE_SCHEMA='{self.schema_}' AND TABLE_NAME='{self.table_}'")
+        pass
 
     def run_sql_nocommit(self, sql, params=()):
         """
@@ -77,13 +71,12 @@ class ArkDBMySQL:
             method for non-select queries *without commit*
                 sql is string containing SQL
                 params is list containing parameters
-            returns nothing
+            return the cursor of the query
         """
         # TODO: Add crash resilient code to recover from a failed query
-        self.err_ = None
         try:
-            self.cur_.execute(sql, params)
-        except mysql.connector.Error as err:
+            return self.con_.execute(sql, params)
+        except sqlite3.Error as err:
             self.err_ = err
             print('### DB error ###')
             print(f'Error msg: {format(err)}')
@@ -112,8 +105,8 @@ class ArkDBMySQL:
         self.commit()
 
     def run_query_get_all_row(self, query, params=()):
-        self.run_sql_nocommit(query, params)
-        return self.cur_.fetchall()
+        cur = self.run_sql_nocommit(query, params)
+        return cur.fetchall()
 
     def run_query(self, query, params=()):
         """
@@ -124,11 +117,9 @@ class ArkDBMySQL:
             returns a generator with one row per iteration
             each row is a Row factory
         """
-        self.run_sql_nocommit(query, params)
-        row = self.cur_.fetchone()
-        while row is not None:
+        cur = self.run_sql_nocommit(query, params)
+        for row in cur:
             yield row
-            row = self.cur_.fetchone()
 
     def get_query_row(self, query, params=()):
         """
@@ -138,8 +129,8 @@ class ArkDBMySQL:
                 params is list containing parameters
             returns a single row as a Row factory
         """
-        self.run_sql_nocommit(query, params)
-        return self.cur_.fetchone()
+        cur = self.run_sql_nocommit(query, params)
+        return cur.fetchone()
 
     def get_query_value(self, val_name, query, params=()):
         """
@@ -151,7 +142,7 @@ class ArkDBMySQL:
             returns a single value
         """
         row = self.get_query_row(query, params)
-        if row is None or val_name not in row:
+        if row is None or val_name not in row.keys():
             return None
         return row[val_name]
 
@@ -160,16 +151,17 @@ class ArkDBMySQL:
             db.insert(rec)
             insert a single record into the table
                 rec is a dict with key/value pairs corresponding to table schema
+            omit id column to let SQLite generate it
         """
         klist = sorted(rec.keys())
-        values = [rec[v] for v in klist]
+        values = [rec[v] for v in klist]  # a list of values ordered by key
         query = 'INSERT INTO {} ({}) VALUES ({})'.format(
             self.table_,
             ', '.join(klist),
-            ', '.join(['%s'] * len(values))
+            ', '.join('?' * len(values))
         )
-        self.run_sql_nocommit(query, values)
-        return self.cur_.lastrowid
+        cur = self.run_sql_nocommit(query, values)
+        return cur.lastrowid
 
     def insert(self, rec):
         lastrowid = self.insert_nocommit(rec)
@@ -185,17 +177,16 @@ class ArkDBMySQL:
                 rec is a dict with key/value pairs corresponding to table schema
         """
         klist = sorted(rec.keys())
-        values = [rec[v] for v in klist]
+        values = [rec[v] for v in klist]  # a list of values ordered by key
 
-        # do not update id
-        for i, k in enumerate(klist):
+        for i, k in enumerate(klist):  # don't udpate id
             if k == recid_label:
                 del klist[i]
                 del values[i]
 
-        query = 'UPDATE {} SET {} WHERE {} = %s'.format(
+        query = 'UPDATE {} SET {} WHERE {} = ?'.format(
             self.table_,
-            ', '.join(map(lambda s: '{} = %s'.format(s), klist)),
+            ',  '.join(map(lambda s: '{} = ?'.format(s), klist)),
             recid_label
         )
         self.run_sql_nocommit(query, values + [recid])
@@ -209,20 +200,15 @@ class ArkDBMySQL:
             db.delete(recid, recid_label)
             delete a row from the table, by a pair of recid and recid_label
         """
-        query = f'DELETE FROM {self.table_} WHERE {recid_label} = %s'
+        query = f'DELETE FROM {self.table_} WHERE {recid_label} = ?'
         self.run_sql_nocommit(query, [recid])
 
     def delete(self, recid, recid_label):
         self.delete_nocommit(recid, recid_label)
         self.commit()
 
-    def optimize(self, table=None):
-        if not table:
-            table = self.table_
-        self.run_sql(f'optimize table {table}')
-
     def is_table_exist(self, table):
-        res = self.run_query_get_all_row(f"SHOW TABLES LIKE '{table}'")
+        res = self.run_query_get_all_row(f"SELECT name FROM sqlite_master WHERE type = 'table' AND name = '{table}'")
         return len(res) != 0
 
     def countrecs(self):
@@ -246,39 +232,5 @@ class ArkDBMySQL:
         query += ', PRIMARY KEY ('
         query += ', '.join([f'`{col}`' for col in table_desc_dict['table_pks']])
         query += '))'
-        query += 'ENGINE = InnoDB'
         self.run_sql(query)
         return True
-
-    def add_index(self, item, table=None):
-        if not table:
-            table = self.table_
-        indexes = self.run_query_get_all_row(f'SHOW INDEX FROM {table}')
-        for row in indexes:
-            if row['Column_name'] == item:
-                print(f'Index {item} already exists in table {table}')
-                return False
-        self.run_sql(f'ALTER TABLE {table} ADD INDEX ({item})')
-        print(f'Added index {item} for table {table}')
-        return True
-
-    def remove_index(self, item, table=None):
-        if not table:
-            table = self.table_
-        indexes = self.run_query_get_all_row(f'SHOW INDEX FROM {table}')
-        for row in indexes:
-            if row['Column_name'] == item:
-                break
-        else:
-            print(f'Index {item} does not exist in table {table}')
-            return False
-        self.run_sql(f'DROP INDEX `{item}` ON {table}')
-        print(f'Removed index {item} for table {table}')
-        return True
-
-    def get_table_disk_size(self, table=None):
-        if not table:
-            table = self.table_
-        data_size = self.get_query_value('size_in_mb', f'SELECT table_name AS `Table`, round(((data_length) / 1024 / 1024), 2) AS `size_in_mb` FROM information_schema.TABLES WHERE table_schema = "{self.schema_}" AND table_name = "{table}"')
-        index_size = self.get_query_value('size_in_mb', f'SELECT table_name AS `Table`, round(((index_length) / 1024 / 1024), 2) AS `size_in_mb` FROM information_schema.TABLES WHERE table_schema = "{self.schema_}" AND table_name = "{table}"')
-        return data_size, index_size
