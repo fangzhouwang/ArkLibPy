@@ -8,6 +8,8 @@ __version__ = '1.0.0'
 
 
 class ArkDBSQLite:
+    kQUERY_PARAM_PLACE_HOLDER = '?'
+
     def __init__(self, **kwargs):
         """
             db = ArkDBSQLite ( [ table = ''] [, filename = ''] )
@@ -50,6 +52,8 @@ class ArkDBSQLite:
         self.table_ = table_name
 
     def get_table(self):
+        if self.table_ == '' or self.table_ is None:
+            raise ValueError('no table selected, set_table first')
         return self.table_
 
     def set_auto_inc(self, inc):
@@ -156,9 +160,9 @@ class ArkDBSQLite:
         klist = sorted(rec.keys())
         values = [rec[v] for v in klist]  # a list of values ordered by key
         query = 'INSERT INTO {} ({}) VALUES ({})'.format(
-            self.table_,
+            self.get_table(),
             ', '.join(klist),
-            ', '.join('?' * len(values))
+            ', '.join(self.kQUERY_PARAM_PLACE_HOLDER * len(values))
         )
         cur = self.run_sql_nocommit(query, values)
         return cur.lastrowid
@@ -184,10 +188,11 @@ class ArkDBSQLite:
                 del klist[i]
                 del values[i]
 
-        query = 'UPDATE {} SET {} WHERE {} = ?'.format(
-            self.table_,
+        query = 'UPDATE {} SET {} WHERE {} = {}'.format(
+            self.get_table(),
             ',  '.join(map(lambda s: '{} = ?'.format(s), klist)),
-            recid_label
+            recid_label,
+            self.kQUERY_PARAM_PLACE_HOLDER
         )
         self.run_sql_nocommit(query, values + [recid])
 
@@ -200,7 +205,7 @@ class ArkDBSQLite:
             db.delete(recid, recid_label)
             delete a row from the table, by a pair of recid and recid_label
         """
-        query = f'DELETE FROM {self.table_} WHERE {recid_label} = ?'
+        query = f'DELETE FROM {self.get_table()} WHERE {recid_label} = {self.kQUERY_PARAM_PLACE_HOLDER}'
         self.run_sql_nocommit(query, [recid])
 
     def delete(self, recid, recid_label):
@@ -217,7 +222,7 @@ class ArkDBSQLite:
             count the records in the table
             returns a single integer value
         """
-        query = f'SELECT COUNT(*) AS CNT FROM {self.table_}'
+        query = f'SELECT COUNT(*) AS CNT FROM {self.get_table()}'
         return self.get_query_value('CNT', query)
 
     def create_table(self, table_desc_dict, force=False):

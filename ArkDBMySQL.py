@@ -8,6 +8,8 @@ __version__ = '1.0.0'
 
 
 class ArkDBMySQL:
+    kQUERY_PARAM_PLACE_HOLDER = '%s'
+
     def __init__(self, **kwargs):
         """
             db = ArkDBMySQL( [ table = ''] [, db_config_file = ''] )
@@ -49,13 +51,15 @@ class ArkDBMySQL:
             schema=self.schema_,
             port=self.port_,
         )
-        duplicated_db.set_table(self.table_)
+        duplicated_db.set_table(self.get_table())
         return duplicated_db
 
     def set_table(self, table_name):
         self.table_ = table_name
 
     def get_table(self):
+        if self.table_ == '' or self.table_ is None:
+            raise ValueError('no table selected, set_table first')
         return self.table_
 
     def set_auto_inc(self, inc):
@@ -63,13 +67,13 @@ class ArkDBMySQL:
         if cur_inc >= inc:
             print(f'Error: Current value {cur_inc} is larger than {inc}')
             return False
-        self.run_sql(f'ALTER TABLE {self.table_} AUTO_INCREMENT=%s', [inc])
+        self.run_sql(f'ALTER TABLE {self.get_table()} AUTO_INCREMENT={self.kQUERY_PARAM_PLACE_HOLDER}', [inc])
         return True
 
     def get_auto_inc(self):
         return self.get_query_value('AUTO_INCREMENT',
                                     f"SELECT AUTO_INCREMENT FROM INFORMATION_SCHEMA.TABLES "
-                                    f"WHERE TABLE_SCHEMA='{self.schema_}' AND TABLE_NAME='{self.table_}'")
+                                    f"WHERE TABLE_SCHEMA='{self.schema_}' AND TABLE_NAME='{self.get_table()}'")
 
     def run_sql_nocommit(self, sql, params=()):
         """
@@ -164,9 +168,9 @@ class ArkDBMySQL:
         klist = sorted(rec.keys())
         values = [rec[v] for v in klist]
         query = 'INSERT INTO {} ({}) VALUES ({})'.format(
-            self.table_,
+            self.get_table(),
             ', '.join(klist),
-            ', '.join(['%s'] * len(values))
+            ', '.join([self.kQUERY_PARAM_PLACE_HOLDER] * len(values))
         )
         self.run_sql_nocommit(query, values)
         return self.cur_.lastrowid
@@ -193,10 +197,11 @@ class ArkDBMySQL:
                 del klist[i]
                 del values[i]
 
-        query = 'UPDATE {} SET {} WHERE {} = %s'.format(
-            self.table_,
+        query = 'UPDATE {} SET {} WHERE {} = {}'.format(
+            self.get_table(),
             ', '.join(map(lambda s: '{} = %s'.format(s), klist)),
-            recid_label
+            recid_label,
+            self.kQUERY_PARAM_PLACE_HOLDER
         )
         self.run_sql_nocommit(query, values + [recid])
 
@@ -209,7 +214,7 @@ class ArkDBMySQL:
             db.delete(recid, recid_label)
             delete a row from the table, by a pair of recid and recid_label
         """
-        query = f'DELETE FROM {self.table_} WHERE {recid_label} = %s'
+        query = f'DELETE FROM {self.get_table()} WHERE {recid_label} = {self.kQUERY_PARAM_PLACE_HOLDER}'
         self.run_sql_nocommit(query, [recid])
 
     def delete(self, recid, recid_label):
@@ -218,7 +223,7 @@ class ArkDBMySQL:
 
     def optimize(self, table=None):
         if not table:
-            table = self.table_
+            table = self.get_table()
         self.run_sql(f'optimize table {table}')
 
     def is_table_exist(self, table):
@@ -231,7 +236,7 @@ class ArkDBMySQL:
             count the records in the table
             returns a single integer value
         """
-        query = f'SELECT COUNT(*) AS CNT FROM {self.table_}'
+        query = f'SELECT COUNT(*) AS CNT FROM {self.get_table()}'
         return self.get_query_value('CNT', query)
 
     def create_table(self, table_desc_dict, force=False):
@@ -252,7 +257,7 @@ class ArkDBMySQL:
 
     def add_index(self, item, table=None):
         if not table:
-            table = self.table_
+            table = self.get_table()
         indexes = self.run_query_get_all_row(f'SHOW INDEX FROM {table}')
         for row in indexes:
             if row['Column_name'] == item:
@@ -264,7 +269,7 @@ class ArkDBMySQL:
 
     def remove_index(self, item, table=None):
         if not table:
-            table = self.table_
+            table = self.get_table()
         indexes = self.run_query_get_all_row(f'SHOW INDEX FROM {table}')
         for row in indexes:
             if row['Column_name'] == item:
@@ -278,7 +283,7 @@ class ArkDBMySQL:
 
     def get_table_disk_size(self, table=None):
         if not table:
-            table = self.table_
+            table = self.get_table()
         data_size = self.get_query_value('size_in_mb', f'SELECT table_name AS `Table`, round(((data_length) / 1024 / 1024), 2) AS `size_in_mb` FROM information_schema.TABLES WHERE table_schema = "{self.schema_}" AND table_name = "{table}"')
         index_size = self.get_query_value('size_in_mb', f'SELECT table_name AS `Table`, round(((index_length) / 1024 / 1024), 2) AS `size_in_mb` FROM information_schema.TABLES WHERE table_schema = "{self.schema_}" AND table_name = "{table}"')
         return data_size, index_size
