@@ -1,5 +1,5 @@
 import unittest
-from src.database.ArkDBSQLite import *
+from arklibpy.database.ArkDBSQLite import *
 import os
 
 

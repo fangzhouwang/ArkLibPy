@@ -6,15 +6,15 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 setup(
-    name='ark_lib',
-    version='0.1.0',
+    name='arklibpy',
+    version='0.1.4',
     author='Fangzhou Wang',
     author_email='fwangusc@gmail.com',
     license='MIT',
     keywords='Database',
     long_description=open(path.join(here, 'README.md'), encoding='utf-8').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/fangzhouwang/ArkLibPy',
+    url='https://github.com/fangzhouwang/arklibpy',
     classifiers=[  # Optional
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

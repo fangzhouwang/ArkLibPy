@@ -1,5 +1,5 @@
 import unittest
-from src.database.ArkDBMySQL import *
+from arklibpy.database.ArkDBMySQL import *
 from os import path
 
 
