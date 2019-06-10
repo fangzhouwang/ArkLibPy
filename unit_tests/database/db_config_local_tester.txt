@@ -1,0 +1,5 @@
+localhost
+tester
+tester
+gtest
+3306

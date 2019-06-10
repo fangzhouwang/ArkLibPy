@@ -1,10 +1,12 @@
 import unittest
-from ArkLibPy.ArkDBMySQL import *
+from src.database.ArkDBMySQL import *
+from os import path
 
 
 class ArkDBMySQLTestCase(unittest.TestCase):
     def setUp(self):
-        self.db_ = ArkDBMySQL(db_config_file='/Users/Ark/.db_configs/db_config_local_tester.txt')
+        here = path.abspath(path.dirname(__file__))
+        self.db_ = ArkDBMySQL(db_config_file=path.join(here, 'db_config_local_tester.txt'))
         self.table_ = "test_table"
 
     def test_config_file(self):

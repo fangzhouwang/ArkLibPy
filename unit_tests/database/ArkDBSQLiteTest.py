@@ -1,11 +1,12 @@
 import unittest
-from ArkLibPy.ArkDBSQLite import *
+from src.database.ArkDBSQLite import *
 import os
 
 
 class ArkDBSQLiteTestCase(unittest.TestCase):
     def setUp(self):
-        self.db_ = ArkDBSQLite(db_config_file='/Users/Ark/.db_configs/db_config_local_tester.txt')
+        here = os.path.abspath(os.path.dirname(__file__))
+        self.db_ = ArkDBSQLite(db_config_file=os.path.join(here, 'db_config_local_tester.txt'))
         self.table_ = "test_table"
 
     def tearDown(self):
