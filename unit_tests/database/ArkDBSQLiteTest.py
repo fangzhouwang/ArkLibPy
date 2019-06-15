@@ -6,11 +6,16 @@ import os
 class ArkDBSQLiteTestCase(unittest.TestCase):
     def setUp(self):
         here = os.path.abspath(os.path.dirname(__file__))
-        self.db_ = ArkDBSQLite(db_config_file=os.path.join(here, 'db_config_local_tester.txt'))
+        path = os.getcwd()
+        self.db_ = ArkDBSQLite(
+            db_config_file=os.path.join(here,'db_config_local_tester.txt'),
+            db_filepath=path
+        )
         self.table_ = "test_table"
 
     def tearDown(self):
-        os.remove(self.db_.dbfilename_)
+        pass
+        self.db_.remove_db_from_disk()
 
     def test_connection(self):
         self.db_.run_sql(f'DROP TABLE IF EXISTS {self.table_}')

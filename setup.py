@@ -7,7 +7,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(
     name='arklibpy',
-    version='0.1.4',
+    version='0.1.5',
     author='Fangzhou Wang',
     author_email='fwangusc@gmail.com',
     license='MIT',

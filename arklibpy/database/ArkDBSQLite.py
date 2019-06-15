@@ -3,8 +3,9 @@
 # Extended from bwDB - CRUD library for sqlite 3 by Bill Weinman [http://bw.org/]
 
 import sqlite3
+import os
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 
 class ArkDBSQLite:
@@ -18,13 +19,16 @@ class ArkDBSQLite:
         db_config_file = kwargs.get('db_config_file', '')
         if db_config_file:
             with open(db_config_file) as config:
-                config.readline().rstrip() # skip host
-                config.readline().rstrip() # skip user
-                config.readline().rstrip() # skip password
-                self.filename_ = config.readline().rstrip() # use schema name as filename
+                config.readline().rstrip()  # skip host
+                config.readline().rstrip()  # skip user
+                config.readline().rstrip()  # skip password
+                db_filename = config.readline().rstrip() # use schema name as filename
         else:
-            # see filename setter below
-            self.filename_ = kwargs.get('filename')
+            db_filename = kwargs.get('filename')
+
+        self.filepath_ = kwargs.get('db_filepath', '.')
+        # see filename setter below
+        self.filename_ = f'{self.filepath_}/{db_filename}'
 
         self.table_ = ''
         self.err_ = None
@@ -43,6 +47,9 @@ class ArkDBSQLite:
     @filename_.deleter
     def filename_(self):
         self.close()
+
+    def remove_db_from_disk(self):
+        os.remove(f'{self.dbfilename_}')
 
     def close(self):
         self.con_.close()
